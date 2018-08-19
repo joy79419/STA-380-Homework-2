@@ -1,0 +1,418 @@
+---
+title: "Assignment 2"
+author: "Hung-Yen Chen, Lu-Hao Kuo, Jihyun Lee and Matthew Zlotnik"
+date: "2018.08.18"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=18, fig.height=8) 
+```
+
+## Flights at ABIA
+```{r results='hide', message=FALSE, warning=FALSE}
+library(ggplot2)
+library(reshape2)
+air = read.csv('../data/ABIA.csv',stringsAsFactors = FALSE)
+```
+First, we wanted to know which month is the best time to take a flight in Austin Airport. We took departure and arrival delay time and cancellation in to consideration. <br>
+
+### Month vs Delay and Cancellation
+```{r}
+month_mean_depdelay = aggregate(DepDelay~factor(Month), air, mean)
+month_mean_arrdelay = aggregate(ArrDelay~factor(Month), air, mean)
+month_cancel = aggregate(Cancelled~factor(Month),air,mean)
+month_delay_cancel <- cbind(month_cancel,month_mean_depdelay[,2],month_mean_arrdelay[,2])
+names(month_delay_cancel) <- c("Month","Cancelled","Departure_Delay","Arrival_Delay")
+month_delay_cancel <- melt(month_delay_cancel,id.vars = c(1,2))
+
+update_geom_defaults("bar",   list(colour = "red4"))
+ggplot(month_delay_cancel, aes(x=Month,y=value,fill=variable)) + 
+  ylab("Average Delay Minutes")+
+  geom_bar(stat="identity",position = position_dodge())+
+  geom_line(aes(y=Cancelled*500,group = 1,color="Average Canceled Rate"),size=1,stat = "identity")+
+  geom_point(aes(y = Cancelled*500,group = 1),color="red4")+
+  geom_text(aes(y =Cancelled*500,group = 1, label = round(Cancelled, 4)), vjust = 1.4, color = "red4", size = 4)+
+  scale_y_continuous(sec.axis = sec_axis(~./500,name="Average Canceled Rate"))+
+  scale_fill_discrete(name = "Delay")+
+  scale_color_discrete(name = " ")
+```
+
+As we can see, Fall is the best season to take a flight, because September, October and November are top 3 months with least average delay time in minutes. These months have only 5 minutes departure delay and the passengers usually can arrived at the destination on time.  However, September has a pretty high average cancellation rate. After searching Sep 2008 flights records, we found that the flights were cancelled because of Hurricane Ike. We can also see that December has the most delay minutes. <br><br>
+For the next part, we wanted to find out which day of the week is the best day to catch a flight. <br>
+
+### Weekday vs Delay and Cancellation
+```{r}
+week_mean_depdelay = aggregate(DepDelay~factor(DayOfWeek), air, mean)
+week_mean_arrdelay = aggregate(ArrDelay~factor(DayOfWeek), air, mean)
+week_cancel = aggregate(Cancelled~factor(DayOfWeek),air,mean)
+week_delay_cancel <- cbind(week_cancel,week_mean_depdelay[,2],week_mean_arrdelay[,2])
+names(week_delay_cancel) <- c("Dow","Cancelled","Departure_Delay","Arrival_Delay")
+week_delay_cancel[1]=c("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
+week_delay_cancel <- melt(week_delay_cancel,id.vars = c(1,2))
+
+ggplot(week_delay_cancel, aes(x=Dow,y=value,fill=variable)) + 
+  ylab("Average Delay Minutes")+
+  geom_bar(stat="identity",position = position_dodge())+
+  geom_line(aes(y=Cancelled*500,group = 1,color="Average Cancelled Rate"),size=1,stat = "identity")+
+  geom_point(aes(y = Cancelled*500,group = 1),color="red4")+
+  geom_text(aes(y =Cancelled*500,group = 1, label = round(Cancelled, 4)), vjust = 1.4, color = "red4", size = 4)+
+  scale_y_continuous(sec.axis = sec_axis(~./500,name="Average Canceled Rate"))+
+  scale_x_discrete(limits=c("Mon","Tue","Wed","Thu","Fri","Sat","Sun"))+
+  scale_fill_discrete(name = "Delay")+
+  scale_color_discrete(name = " ")
+```
+
+We can see that Wednesday and Saturday have the least delay time, but there is not a really significant difference between these days. One thing that is noticeable is that Tuesday has the highest cancellation rate. <br><br>
+Next, we wanted to explore which airport has the highest delay time and cancellation rate. 
+
+### Airport vs Delay and Cancellation
+```{r}
+airport_mean_depdelay = aggregate(DepDelay~factor(Origin), air, mean)
+airport_mean_arrdelay = aggregate(ArrDelay~factor(Origin), air, mean)
+airport_mean_depdelay = airport_mean_depdelay[1:52,]
+airport_cancel = aggregate(Cancelled~factor(Origin),air,mean)
+airport_cancel = airport_cancel[1:52,]
+airport_delay_cancel <- cbind(airport_cancel,airport_mean_depdelay[,2],airport_mean_arrdelay[,2])
+names(airport_delay_cancel) <- c("Airport","Cancelled","Departure_Delay","Arrival_Delay")
+airport_delay_cancel <- melt(airport_delay_cancel,id.vars = c(1,2))
+
+ggplot(airport_delay_cancel, aes(x=Airport,y=value,fill=variable)) + 
+  ylab("Average Delay Minutes")+
+  geom_bar(stat="identity",position = position_dodge())+
+  geom_line(aes(y=Cancelled*500,group = 1,color="Average Canceled Rate"),size=1,stat = "identity")+
+  geom_point(aes(y = Cancelled*500,group = 1),color="red4")+
+  geom_text(aes(y =Cancelled*500,group = 1, label = round(Cancelled, 4)), vjust = 1.4, color = "red4", size = 3)+
+  scale_y_continuous(sec.axis = sec_axis(~./500,name="Average Canceled Rate"))+
+  scale_fill_discrete(name = "Delay")+
+  scale_color_discrete(name = " ")
+```
+
+In this bar chart, we plotted both delay time for origin airport of the flight. As a result, we can figure out if the passengers is in specific airport and have a flight to Austin, how much delay time they should expect. We can see that for TUS airport, the mean arrival delay is almost 100 minutes. That is because that the flights from TUS to Austin are all from XE, which is a private jet company. Because TUS airport is an outlier for our analysis, we tried to create the other plot excluding TUS airport. <br>
+
+
+### Excluding TUS from Airport Graph
+```{r}
+airport_mean_depdelay_notus = airport_mean_depdelay[1:51,]
+airport_mean_arrdelay_notus = airport_mean_arrdelay[1:51,]
+airport_cancel_notus = airport_cancel[1:51,]
+airport_delay_cancel_notus = cbind(airport_cancel_notus,airport_mean_depdelay_notus[,2],airport_mean_arrdelay_notus[,2])
+names(airport_delay_cancel_notus) <- c("Airport","Cancelled","Departure_Delay","Arrival_Delay")
+airport_delay_cancel_notus <- melt(airport_delay_cancel_notus,id.vars = c(1,2))
+
+ggplot(airport_delay_cancel_notus, aes(x=Airport,y=value,fill=variable)) + 
+  ylab("Average Delay Minutes")+
+  geom_bar(stat="identity",position = position_dodge())+
+  geom_line(aes(y=Cancelled*600,group = 1,color="Average Canceled Rate"),size=1,stat = "identity")+
+  geom_point(aes(y = Cancelled*600,group = 1),color="red4")+
+  geom_text(aes(y =Cancelled*600,group = 1, label = round(Cancelled, 4)), vjust = 1.4, color = "red4", size = 3.5)+
+  scale_y_continuous(sec.axis = sec_axis(~./600,name="Average Canceled Rate"))+
+  scale_fill_discrete(name = "Delay")+
+  scale_color_discrete(name = " ")
+```
+
+Now we can see that among all the flights to Austin airport, BHM airport will have the highest average delay time in both departure delay and arrival delay. Although the cancellation rate is 0, the passengers have to wait 38 minutes more for departure. Besides, we found that STL airport has the highest cancellation rate. Despite having low average delay time, STL airport have an average of 6.3% cancellation rate. 
+
+## Author attribution <br>
+<p>
+In this part, I will clean the text data, transform as TF-IDF, and construct two models with the first 100 principle components.
+<br>
+
+
+#### Import and cleaning: <br>
+When importing the document, doc_list is a list of authors. <br>Please note that saving any other file under directory of C50train can lead to an importing bug. 
+```{r, data import and cleaning}
+
+library(tm) 
+library(magrittr)
+library(slam)
+library(proxy)
+library(glmnet)
+
+readerPlain = function(fname){
+  readPlain(elem=list(content=readLines(fname)), 
+            id=fname, language='en') }
+setwd("../data/ReutersC50/C50train")
+doc_list = Sys.glob('*')
+file_list = Sys.glob(paste0(doc_list, '/*.txt'))
+
+file_list = Sys.glob(paste0(doc_list, '/*.txt'))
+temp = lapply(file_list, readerPlain) 
+
+
+mynames = file_list %>%
+{ strsplit(., '/', fixed=TRUE) } %>%
+{ lapply(., tail, n=2) } %>%
+{ lapply(., paste0, collapse = '') } %>%
+  unlist
+names(temp) = mynames
+
+
+documents_raw = VCorpus(VectorSource(temp))
+
+my_documents = documents_raw
+my_documents = tm_map(my_documents, content_transformer(tolower)) 
+my_documents = tm_map(my_documents, content_transformer(removeNumbers)) 
+my_documents = tm_map(my_documents, content_transformer(removePunctuation)) 
+my_documents = tm_map(my_documents, content_transformer(stripWhitespace))
+
+DTM = DocumentTermMatrix(my_documents)
+
+DTM = removeSparseTerms(DTM, 0.95)
+#Orignal Sparsity is over 90%. To decrease, remove terms that never show up in 95% or more articles. 
+
+# construct TF IDF weights
+tfidf = weightTfIdf(DTM)
+```
+For the document cleaning, I DID NOT exclude any stopwords. As IDF will take term frequency accross articles into account, a common but meaningless word tends to have lower TF-IDF. Thus, I'll let the TF-IDF calculation to do the work. 
+<br>
+
+#### PCA of the training data
+```{R, PCA of training }
+# Now PCA on tfidf
+X = as.matrix(tfidf)
+summary(colSums(X))
+scrub_cols = which(colSums(X) == 0)
+X = X[,-scrub_cols]
+
+pca= prcomp(X, scale=TRUE)
+summary(pca)$importance[3,]%>%plot()
+
+#independent variables: X
+X = pca$x[,1:100]
+
+all  <- vector()
+i = 1
+for (auther in doc_list){
+  all[i] = auther
+  i = i+1
+}
+
+#Model dependent variable: Y
+Y = vector()
+for( i in 1:2500){
+  Y[i] = all[ceiling(i/50)]
+}
+```
+The increasing rate of cumulative explained variance decreases gradually with the number of PCs. <br>Considering a balance between variable number and explained variance, I pick up the top 100 PCs, with which 37% variance are explained, to build the model.
+
+
+#### Test set import and clean<br>
+likewisely to the process of train set. 
+```{R, import test set }
+readerPlain = function(fname){
+  readPlain(elem=list(content=readLines(fname)), 
+            id=fname, language='en') }
+setwd("../data/ReutersC50/C50test")
+doc_list = Sys.glob('*')
+file_list = Sys.glob(paste0(doc_list, '/*.txt'))
+
+
+file_list = Sys.glob(paste0(doc_list, '/*.txt'))
+cp2 = lapply(file_list, readerPlain) 
+
+
+mynames = file_list %>%
+{ strsplit(., '/', fixed=TRUE) } %>%
+{ lapply(., tail, n=2) } %>%
+{ lapply(., paste0, collapse = '') } %>%
+  unlist
+names(cp2) = mynames
+
+
+documents_raw_1 = VCorpus(VectorSource(cp2))
+
+my_documents1 = documents_raw_1
+my_documents1 = tm_map(my_documents1, content_transformer(tolower)) # make everything lowercase
+my_documents1 = tm_map(my_documents1, content_transformer(removeNumbers)) # remove numbers
+my_documents1 = tm_map(my_documents1, content_transformer(removePunctuation)) # remove punctuation
+my_documents1 = tm_map(my_documents1, content_transformer(stripWhitespace)) ## remove excess white-space
+
+DTM_test = DocumentTermMatrix(my_documents1,control = list(dictionary=Terms(DTM)))
+DTM_test = removeSparseTerms(DTM_test, 0.95)
+
+tfidf_test = weightTfIdf(DTM_test)
+
+X_test = as.matrix(tfidf_test)
+scrub_cols = which(colSums(X_test) == 0)
+X_test = X_test[,-scrub_cols]
+```
+Now, X_test is our TF-IDF of the test file. As our model will be based on the 100 PCs of training set, we need to calculate the linear combination of the test set TF-IDF with the loadings of 100 PCs of trainings set before making prediction.
+
+```{R, transform test_TFIDF to PC space}
+####Matching the column name of test TFIDF to the Train TFIDF
+train_pre_pc = as.matrix(tfidf)
+scrub_cols = which(colSums(train_pre_pc) == 0)
+train_pre_pc = train_pre_pc[,-scrub_cols]
+
+train_name = colnames(train_pre_pc)
+test_name = colnames(X_test)
+sup = setdiff(train_name, test_name)
+
+temp_x = data.frame(X_test)
+for (colname_ in sup){
+  temp_x[,colname_] = 0
+}
+
+##somehow there is still difference
+#This can be identified using:
+#setdiff(colnames(t), train_name)
+
+#hereby I manually fix them
+colnames(temp_x)[colnames(temp_x)=="for."] <- "for"
+colnames(temp_x)[colnames(temp_x)=="next."] <- "next"
+colnames(temp_x)[colnames(temp_x)=="while."] <- "while"
+t = data.matrix(temp_x)
+t <- t[, order(colnames(t))]
+#####
+
+#transform the test set to the principal component spaces of the training set
+test.data <- predict(pca, newdata =t)
+test.data <- as.data.frame(test.data)
+test.data <- test.data[,1:100]
+```
+test.data is the X of test_set for our model to predict. 
+
+#### Model: Logistics LASSO
+```{R, model: LASSO}
+library(MLmetrics)
+library(caret)
+out1 = glmnet(X, factor(Y), family="multinomial")
+p1 = predict(out1, data.matrix(test.data), s=0.01, type = "response")
+
+myPredict_for_out1 <- function(which_article){
+  return(which.max(p1[which_article,,]))
+}
+
+Ya  <- vector()
+i = 1
+for (auther in doc_list){
+  Ya[i] = auther
+  i = i+1
+}
+
+#real is the true values
+real = vector()
+for( i in 1:2500){
+  real[i] = Ya[ceiling(i/50)]
+}
+
+#aut is our prediction
+aut = vector()
+for (i in 1:2500){
+  aut[i] =names(myPredict_for_out1(i))
+}
+
+Accuracy(aut, real)
+
+(table(aut,real)%>%confusionMatrix)$byClass[,"Balanced Accuracy"]
+```
+Out-of-sample overall accuracy is around 41%. The baseline in this prediction is 1/50, which is 2%. To improve the accuracy, one may cross validate on LASSO lambda. Due to limited computation ability, current lambda is only based on manual adjustment. <br>
+"Balanced Accuracy = (sensitivity+specificity)/2"<br>
+Though the overall accuracy is only 41%, the model performs well in term of Sensitivity and Specificity, according to the balanced accuracy(50%~90%). That is, the proportion of actual positives/negatives that are correctly identified is high. 
+
+#### Model: Random Forest
+```{R, model: Random Forest}
+library(randomForest)
+
+fY = factor(Y)
+dfX =data.frame(X)
+XY = cbind(dfX, fY)
+
+rffit = randomForest(fY~.,data=XY,ntree=500)
+prf<- predict(rffit, newdata = test.data)
+Accuracy(prf, factor(real))
+
+(table(prf,real)%>%confusionMatrix)$byClass[,"Balanced Accuracy"]
+```
+Out-of-sample overall accuracy is around 51%, with a similar balanced accuracy of each class. Specifically, both of the models have difficulies to identify ScottHillis, EdnaFernandes and WilliamKazer (balanced accuracy <60%). <br>Acheiving a significantly higher overall accuracy, random forest is preferable to LASSO. 
+
+<p>
+<br>
+
+#### So, are there any sets of authors whose articles seem difficult to distinguish from one another?
+
+To answer this, I derived the cosine distance matrix of each article, drop the reversed duplicates and sorted them. <br>
+With the matrix, we are able to find a corresponding pair of authors who have similar articles. <br>
+I wrote a function to calculate "the number of close article that a specific pair of authors have" under a user-defined threshold of cosine distance.
+```{R, cos distance}
+cosine_docs = function(dtm) {
+  crossprod_simple_triplet_matrix(t(dtm))/(sqrt(col_sums(t(dtm)^2) %*% t(col_sums(t(dtm)^2))))
+}
+
+# use the function to compute pairwise cosine similarity for all documents
+cosine_mat = cosine_docs(tfidf)
+
+myStore = data.frame()
+for(i in 1:2500){
+  myStore[i,1] = as.numeric(i)
+  myStore[i,2] = as.numeric(sort(cosine_mat[i,], decreasing=F)[1]%>%names)
+  myStore[i,3] = sort(cosine_mat[i,], decreasing=F)[1]
+}
+colnames(myStore)<- c("Article_1", "Article_2", "Cosine_Distance")
+
+#These are the articles who are very similar to each other
+myrank = myStore[order(myStore$Cosine_Distance),]
+#drop reversed duplicates
+temp1 = apply(myrank[,1:2],1,function(x) paste(sort(x),collapse=''))
+#These are the articles who are very similar, even identical, to each other
+(myrank[!duplicated(gsub(" ", "", temp1, fixed = TRUE)),])[1:10,]
+
+#These are the corresponding authers
+myrank1 = myrank[!duplicated(gsub(" ", "", temp1, fixed = TRUE)),]
+myrank1$Article_1 = ceiling(myrank1$Article_1/50)
+myrank1$Article_2 = ceiling(myrank1$Article_2/50)
+myrank1 = myrank1[order(myrank1$Cosine_Distance),]
+
+
+#pragma only after myrank1 defined
+myThreshold<- function(threshold){
+  local_df = myrank1[myrank1[,3]<threshold,]
+  tr = apply(local_df[,1:2],1,function(x) paste(sort(x),collapse='-'))%>%table
+  return(tr[order(tr, decreasing = TRUE)])
+}
+
+#These are the authers have lots of similar articles
+myThreshold(0.001)%>%head
+
+```
+_myThreshold__(float threshold): exclude the article pairs that have a cosines distance above threshold, and return a sorted vector specify how many similar articles does the pair of authers have. The number "X-Y" correspond to the sequantial number of authors in the test data. 
+<br>i.e.: under 0.001 cosine distance, auther 1(AaronPressman) and auther 14(JanLopatka) have 8 simiar articles. Thus, their articles may be hard to identify. 
+<br>With the table above, we may identify the similar articles and authors. 
+
+
+## Practice with association rule mining
+
+```{r, results='hide', message=FALSE, warning=FALSE}
+library(tidyverse)
+library(arules) 
+library(arulesViz)
+```
+
+```{r}
+groceries_raw = read.transactions("https://raw.githubusercontent.com/jgscott/STA380/master/data/groceries.txt", sep = ",")
+str(groceries_raw)
+summary(groceries_raw)
+```
+
+```{r}
+groceries_raw <- as (groceries_raw, "transactions")
+
+freqItems = eclat(groceries_raw, parameter = list(supp = .07, maxlen = 15))
+inspect(freqItems)
+itemFrequencyPlot(groceries_raw, topN=15, type="absolute", main="Item Frequency")
+```
+
+We set the parameters to plot top 15 groceries with the largest number of counts in dataset. Based on summary above and this plot of transaction data, 'wholemilk' has the biggest frequency and 'other vegetables' category follows. This might impact the result of our analysis.<br><br>
+      
+We tried several models with different support and confidence level and found 0.15% of support and 60% of confidence level returns the most interesting and distinguishable result. We also set 'manlen=3' since, assuming the retail company puts products in a row at each aisle, retail company often asks that which product should they put on the left and right side of the section. For this practical reason, we choose maxlen=3.
+
+```{r}
+rules <- apriori (groceries_raw, parameter = list(supp = 0.0015, conf = 0.60, maxlen = 3))
+rules_conf <- sort(rules, by="lift", decreasing = TRUE)
+inspect(rules_conf)
+```
+
+Among top 10 assciations with highest lift, we found few interesting facts.<br><br>
+First, considering high association between 'ham, processed cheese' and 'white bread', this retail company should place few selections of white bread neary by 'ham and processed cheese' section for customers who want to make ham-cheese sandwiches. Since bread doesn't require any thermoregulation, the company can easily place small shelf for bread. Since many people buy things impulsively, this placement might only directly target customers who were look for ham-cheese sandwich previously but also remind them ham-cheese sandwiches. From the 4th association, many people buy turkey, vegetables and tropical fruit together and this combination seems to be a common lunch box; turkey sandwich with bananas. Since those associations are combinations with clear intentions, the compamy can not only place them together, but also do some marketing which helps people to remind 'ham-cheese sandwich' or 'turkey sandwich lunch box'.<br><br>
+
+The 9th and 10th association, however, show that customers who bought meat and dairy products, they are 4 times more likely to buy vegetables. Based on this fact, the company may should put three sections together for sale increase effect from complementary goods.<br>
